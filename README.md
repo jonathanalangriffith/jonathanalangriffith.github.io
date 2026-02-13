@@ -1,2 +1,0 @@
-# jonathanalangriffith.github.io
-RaceTimer
