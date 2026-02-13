@@ -1,2 +1,246 @@
 # jonathanalangriffith.github.io
 RaceTimer
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Track Meet Pro - Pace Master</title>
+    <style>
+        :root { --primary: #1a73e8; --success: #27ae60; --danger: #e74c3c; --warn: #f39c12; --bg: #f0f2f5; }
+        body { font-family: -apple-system, sans-serif; background: var(--bg); padding: 10px; color: #333; margin: 0; }
+        .container { max-width: 600px; margin: auto; background: white; border-radius: 15px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); overflow: hidden; }
+        
+        .tabs { display: flex; background: #eee; }
+        .tab { flex: 1; padding: 15px; text-align: center; cursor: pointer; font-weight: bold; border-bottom: 3px solid transparent; }
+        .tab.active { border-bottom-color: var(--primary); color: var(--primary); background: white; }
+        .content { padding: 20px; display: none; }
+        .content.active { display: block; }
+
+        .section { margin-bottom: 20px; padding-bottom: 15px; border-bottom: 1px solid #eee; }
+        .input-group { display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
+        input, select, button, textarea { padding: 12px; border-radius: 8px; border: 1px solid #ddd; font-size: 16px; width: 100%; box-sizing: border-box; }
+        
+        .btn { font-weight: bold; border: none; cursor: pointer; color: white; transition: opacity 0.2s; }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-primary { background: var(--primary); }
+        .btn-success { background: var(--success); }
+        .btn-warn { background: var(--warn); }
+        .btn-danger { background: var(--danger); }
+
+        .master-clock { font-size: 3.5rem; font-weight: 800; text-align: center; margin: 15px 0; font-family: monospace; color: var(--danger); background: #fff5f5; border-radius: 10px; padding: 10px; }
+        
+        /* Pace Logic Styling */
+        .athlete-card { border-left: 6px solid var(--primary); padding: 15px; margin-bottom: 10px; background: #f8f9fa; border-radius: 8px; position: relative; }
+        .athlete-card.on-pace { border-left-color: var(--success); background-color: #f0fff4; }
+        .athlete-card.behind-pace { border-left-color: var(--danger); background-color: #fff5f5; }
+        .pace-indicator { font-size: 0.75rem; font-weight: bold; margin-top: 5px; }
+        .behind-text { color: var(--danger); }
+        .ahead-text { color: var(--success); }
+
+        .athlete-info { display: flex; justify-content: space-between; align-items: start; }
+        .split-list { font-size: 0.8rem; color: #666; margin-top: 5px; display: flex; flex-wrap: wrap; gap: 5px; }
+        .split-tag { background: #eee; padding: 2px 5px; border-radius: 4px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="tabs">
+        <div class="tab active" onclick="switchTab('timer')">Race Timer</div>
+        <div class="tab" onclick="switchTab('roster')">Team Roster</div>
+    </div>
+
+    <div id="timer" class="content active">
+        <div class="section">
+            <input type="text" id="meetName" placeholder="Meet Name" style="margin-bottom: 10px;">
+            <div style="display: flex; gap: 5px; margin-bottom: 10px;">
+                <select id="raceDistance">
+                    <option value="800">800m</option>
+                    <option value="1600" selected>1600m</option>
+                    <option value="3200">3200m</option>
+                </select>
+                <select id="gender" onchange="updateRosterSelect()">
+                    <option value="Boys">Boys</option>
+                    <option value="Girls">Girls</option>
+                </select>
+            </div>
+            
+            <div style="display: grid; grid-template-columns: 2fr 1fr auto; gap: 5px;">
+                <select id="rosterSelect"></select>
+                <input type="text" id="targetTime" placeholder="Goal (M:SS)">
+                <button class="btn btn-primary" onclick="addAthleteFromRoster()">Add</button>
+            </div>
+            <button class="btn btn-success" id="startBtn" onclick="startRace()" style="margin-top:10px;">START HEAT</button>
+        </div>
+
+        <div class="master-clock" id="display">00:00.00</div>
+        <div id="activeRoster"></div>
+        <button class="btn btn-warn" id="saveHeatBtn" onclick="saveHeatToHistory()" style="display:none; margin-top:10px;">FINISH & SAVE HEAT</button>
+        
+        <div class="section" style="margin-top: 20px;">
+            <button class="btn btn-primary" onclick="exportFullMeet()">EXPORT MEET TO EXCEL</button>
+        </div>
+    </div>
+
+    <div id="roster" class="content">
+        <h3>Team Roster</h3>
+        <textarea id="boysInput" rows="3" placeholder="Boys names (comma separated)"></textarea>
+        <textarea id="girlsInput" rows="3" placeholder="Girls names (comma separated)" style="margin-top:10px;"></textarea>
+        <button class="btn btn-primary" onclick="saveMasterRoster()" style="margin-top:10px;">Save Roster</button>
+    </div>
+</div>
+
+<script>
+    let startTime, running = false, athletes = [], interval;
+    const lapMap = { "800": 2, "1600": 4, "3200": 8 };
+
+    window.onload = () => { loadMasterRoster(); updateRosterSelect(); };
+
+    function switchTab(t) {
+        document.querySelectorAll('.tab, .content').forEach(el => el.classList.remove('active'));
+        event.currentTarget.classList.add('active');
+        document.getElementById(t).classList.add('active');
+    }
+
+    function timeToMs(timeStr) {
+        if (!timeStr) return 0;
+        const parts = timeStr.split(':');
+        if (parts.length === 2) return (parseInt(parts[0]) * 60 + parseFloat(parts[1])) * 1000;
+        return parseFloat(parts[0]) * 1000;
+    }
+
+    function formatTime(ms) {
+        let m = Math.floor(ms / 60000), s = Math.floor((ms % 60000) / 1000), c = Math.floor((ms % 1000) / 10);
+        return `${m}:${s.toString().padStart(2, '0')}.${c.toString().padStart(2, '0')}`;
+    }
+
+    function saveMasterRoster() {
+        const boys = document.getElementById('boysInput').value.split(',').map(s => s.trim()).filter(s => s);
+        const girls = document.getElementById('girlsInput').value.split(',').map(s => s.trim()).filter(s => s);
+        localStorage.setItem('masterRoster', JSON.stringify({ boys, girls }));
+        updateRosterSelect();
+        alert("Roster Updated!");
+    }
+
+    function loadMasterRoster() {
+        const data = JSON.parse(localStorage.getItem('masterRoster') || '{"boys":[],"girls":[]}');
+        document.getElementById('boysInput').value = data.boys.join(', ');
+        document.getElementById('girlsInput').value = data.girls.join(', ');
+    }
+
+    function updateRosterSelect() {
+        const gender = document.getElementById('gender').value.toLowerCase();
+        const data = JSON.parse(localStorage.getItem('masterRoster') || '{"boys":[],"girls":[]}');
+        const select = document.getElementById('rosterSelect');
+        select.innerHTML = '<option value="">Select Athlete...</option>';
+        data[gender].forEach(name => select.innerHTML += `<option value="${name}">${name}</option>`);
+    }
+
+    function addAthleteFromRoster() {
+        const name = document.getElementById('rosterSelect').value;
+        const target = timeToMs(document.getElementById('targetTime').value);
+        if (!name || running) return;
+        athletes.push({ name, targetMs: target, splits: [], splitsMs: [], status: 'on-pace', finished: false });
+        renderActiveRoster();
+        document.getElementById('targetTime').value = "";
+    }
+
+    function renderActiveRoster() {
+        const container = document.getElementById('activeRoster');
+        const totalLaps = lapMap[document.getElementById('raceDistance').value];
+        container.innerHTML = '';
+        athletes.forEach((a, i) => {
+            const lapTarget = a.targetMs / totalLaps;
+            const currentLap = a.splits.length;
+            const expectedTotal = lapTarget * currentLap;
+            const actualTotal = a.splitsMs[currentLap - 1] || 0;
+            const diff = actualTotal - expectedTotal;
+
+            const div = document.createElement('div');
+            div.className = `athlete-card ${a.finished ? 'on-pace' : a.status}`;
+            div.innerHTML = `
+                <div class="athlete-info">
+                    <div>
+                        <strong>${a.name}</strong> 
+                        ${a.targetMs ? `<span style="font-size:0.7rem;">(Goal: ${formatTime(a.targetMs)})</span>` : ''}
+                        <div class="pace-indicator">
+                            ${currentLap > 0 && a.targetMs ? 
+                                (diff > 0 ? `<span class="behind-text">+${(diff/1000).toFixed(2)}s Behind Pace</span>` : 
+                                `<span class="ahead-text">${(Math.abs(diff)/1000).toFixed(2)}s Ahead of Pace</span>`) : 'Waiting for first split...'}
+                        </div>
+                    </div>
+                    ${a.finished ? '🏁' : `<button class="btn btn-warn" onclick="recordSplit(${i})" ${!running ? 'disabled' : ''} style="width:auto;">SPLIT</button>`}
+                </div>
+                <div class="split-list">
+                    ${a.splits.map((s, idx) => `<span class="split-tag">L${idx+1}: ${s}</span>`).join('')}
+                </div>
+            `;
+            container.appendChild(div);
+        });
+    }
+
+    function startRace() {
+        if (!athletes.length) return;
+        running = true;
+        startTime = Date.now();
+        interval = setInterval(() => document.getElementById('display').innerText = formatTime(Date.now() - startTime), 10);
+        document.getElementById('startBtn').disabled = true;
+        document.getElementById('saveHeatBtn').style.display = 'block';
+        renderActiveRoster();
+    }
+
+    function recordSplit(i) {
+        const totalLaps = lapMap[document.getElementById('raceDistance').value];
+        const elapsed = Date.now() - startTime;
+        const a = athletes[i];
+        
+        if (a.splits.length < totalLaps) {
+            a.splits.push(formatTime(elapsed));
+            a.splitsMs.push(elapsed);
+            
+            if (a.targetMs) {
+                const targetForThisLap = (a.targetMs / totalLaps) * a.splits.length;
+                a.status = elapsed > targetForThisLap ? 'behind-pace' : 'on-pace';
+            }
+
+            if (a.splits.length == totalLaps) a.finished = true;
+            renderActiveRoster();
+        }
+    }
+
+    function saveHeatToHistory() {
+        const history = JSON.parse(localStorage.getItem('meetHistory') || '[]');
+        history.push({
+            meet: document.getElementById('meetName').value || "Meet",
+            event: `${document.getElementById('gender').value} ${document.getElementById('raceDistance').value}m`,
+            athletes: JSON.parse(JSON.stringify(athletes)),
+            date: new Date().toLocaleDateString()
+        });
+        localStorage.setItem('meetHistory', JSON.stringify(history));
+        athletes = []; running = false; clearInterval(interval);
+        document.getElementById('display').innerText = "00:00.00";
+        document.getElementById('startBtn').disabled = false;
+        document.getElementById('saveHeatBtn').style.display = 'none';
+        renderActiveRoster();
+    }
+
+    function exportFullMeet() {
+        const history = JSON.parse(localStorage.getItem('meetHistory') || '[]');
+        let csv = "Athlete,Event,Target,Final,Diff,Split1,Split2,Split3,Split4,Split5,Split6,Split7,Split8\n";
+        history.forEach(h => {
+            h.athletes.forEach(a => {
+                const final = a.splitsMs[a.splitsMs.length-1];
+                const diff = a.targetMs ? (final - a.targetMs)/1000 : 0;
+                csv += `${a.name},${h.event},${formatTime(a.targetMs)},${formatTime(final)},${diff}s,${a.splits.join(',')}\n`;
+            });
+        });
+        const blob = new Blob([csv], { type: 'text/csv' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = `Meet_Results_Export.csv`;
+        a.click();
+    }
+</script>
+</body>
+</html>
