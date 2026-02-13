@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Track Meet Pro - Data Master</title>
+    <title>Track Meet Pro - Fix V3</title>
     <style>
         :root { --primary: #1a73e8; --success: #27ae60; --danger: #e74c3c; --warn: #f39c12; --bg: #f0f2f5; }
         body { font-family: -apple-system, sans-serif; background: var(--bg); padding: 10px; color: #333; margin: 0; }
@@ -15,7 +15,7 @@
         .content.active { display: block; }
         .section { margin-bottom: 20px; padding-bottom: 15px; border-bottom: 1px solid #eee; }
         input, select, button, textarea { padding: 12px; border-radius: 8px; border: 1px solid #ddd; font-size: 16px; width: 100%; box-sizing: border-box; }
-        .btn { font-weight: bold; border: none; cursor: pointer; color: white; transition: 0.2s; }
+        .btn { font-weight: bold; border: none; cursor: pointer; color: white; transition: 0.1s; active { transform: scale(0.98); } }
         .btn-primary { background: var(--primary); }
         .btn-success { background: var(--success); }
         .btn-warn { background: var(--warn); }
@@ -25,9 +25,9 @@
         .athlete-card.finished { border-left-color: #333; background-color: #eee; }
         .athlete-info { display: flex; justify-content: space-between; align-items: center; }
         .split-grid { margin-top: 10px; display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 8px; }
-        .split-tag { background: #fff; border: 1px solid #ddd; padding: 5px; border-radius: 4px; font-size: 0.75rem; }
+        .split-tag { background: #fff; border: 1px solid #ddd; padding: 8px; border-radius: 4px; font-size: 0.85rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
         .lap-val { color: var(--primary); font-weight: bold; display: block; }
-        .total-val { color: #666; font-size: 0.7rem; display: block; }
+        .total-val { color: #666; font-size: 0.75rem; display: block; }
     </style>
 </head>
 <body>
@@ -62,7 +62,6 @@
         
         <button class="btn btn-warn" id="saveHeatBtn" onclick="saveHeatToHistory()" style="display:none; margin-top:10px;">FINISH & SAVE HEAT</button>
         <button class="btn btn-primary" onclick="exportFullMeet()" style="margin-top:20px;">EXPORT FULL MEET TO EXCEL</button>
-        
         <button class="btn btn-danger-outline" onclick="clearAllHistory()">CLEAR ALL SAVED HISTORY</button>
     </div>
 
@@ -87,6 +86,7 @@
     }
 
     function formatTime(ms) {
+        if (isNaN(ms) || ms < 0) return "0:00.00";
         let m = Math.floor(ms/60000), s = Math.floor((ms%60000)/1000), c = Math.floor((ms%1000)/10);
         return `${m}:${s.toString().padStart(2,'0')}.${c.toString().padStart(2,'0')}`;
     }
@@ -115,7 +115,7 @@
 
     function addAthleteFromRoster() {
         const name = document.getElementById('rosterSelect').value;
-        if (!name || running) return;
+        if (!name) return;
         athletes.push({ name, splits: [], splitsMs: [], lapTimes: [], finished: false });
         renderActiveRoster();
     }
@@ -132,7 +132,7 @@
             div.innerHTML = `
                 <div class="athlete-info">
                     <strong>${a.name}</strong>
-                    ${a.finished ? '🏁' : `<button class="btn btn-warn" onclick="recordSplit(${i})" ${!running ? 'disabled' : ''} style="width:auto;">${isSprint ? 'FINISH' : 'SPLIT'}</button>`}
+                    ${a.finished ? '🏁' : `<button class="btn btn-warn" onclick="recordSplit(${i})" style="width:auto;">${isSprint ? 'FINISH' : 'SPLIT'}</button>`}
                 </div>
                 <div class="split-grid">
                     ${a.splits.map((s, idx) => `
@@ -148,27 +148,37 @@
     }
 
     function startRace() {
-        if (!athletes.length) return;
+        if (!athletes.length) return alert("Add athletes first!");
         running = true;
         startTime = Date.now();
-        interval = setInterval(() => document.getElementById('display').innerText = formatTime(Date.now()-startTime), 10);
+        interval = setInterval(() => {
+            document.getElementById('display').innerText = formatTime(Date.now() - startTime);
+        }, 10);
         document.getElementById('startBtn').disabled = true;
         document.getElementById('saveHeatBtn').style.display = 'block';
     }
 
     function recordSplit(i) {
-        const dist = document.getElementById('raceDistance').value;
-        const totalLaps = lapMap[dist];
-        const elapsed = Date.now() - startTime;
+        if (!running) return;
+        
+        const distKey = document.getElementById('raceDistance').value;
+        const totalLaps = parseInt(lapMap[distKey]);
+        const nowMs = Date.now();
+        const elapsed = nowMs - startTime;
         const a = athletes[i];
 
         if (a.splits.length < totalLaps) {
-            const lastMs = a.splitsMs.length > 0 ? a.splitsMs[a.splitsMs.length-1] : 0;
-            const lapMs = elapsed - lastMs;
+            const lastMs = a.splitsMs.length > 0 ? a.splitsMs[a.splitsMs.length - 1] : 0;
+            const lapDuration = elapsed - lastMs;
+            
+            // Push formatted strings and raw numbers
             a.splits.push(formatTime(elapsed));
             a.splitsMs.push(elapsed);
-            a.lapTimes.push(formatTime(lapMs));
-            if (a.splits.length == totalLaps) a.finished = true;
+            a.lapTimes.push(formatTime(lapDuration));
+            
+            if (a.splits.length >= totalLaps) {
+                a.finished = true;
+            }
             renderActiveRoster();
         }
     }
@@ -183,7 +193,10 @@
             date: new Date().toLocaleDateString()
         });
         localStorage.setItem('meetHistory', JSON.stringify(history));
-        athletes = []; running = false; clearInterval(interval);
+        
+        athletes = []; 
+        running = false; 
+        clearInterval(interval);
         document.getElementById('display').innerText = "00:00.00";
         document.getElementById('startBtn').disabled = false;
         document.getElementById('saveHeatBtn').style.display = 'none';
@@ -191,7 +204,7 @@
     }
 
     function clearAllHistory() {
-        if(confirm("WARNING: This will permanently delete ALL saved meet results from this device. Do you want to proceed?")) {
+        if(confirm("Permanently delete ALL saved results?")) {
             localStorage.removeItem('meetHistory');
             alert("History cleared.");
         }
@@ -199,7 +212,8 @@
 
     function exportFullMeet() {
         const history = JSON.parse(localStorage.getItem('meetHistory') || '[]');
-        if (!history.length) return alert("No results saved yet.");
+        if (!history.length) return alert("No results saved.");
+        
         let csv = "Meet Name,Date,Gender,Distance,Athlete,Final Time,L1 Split,L1 Lap,L2 Split,L2 Lap,L3 Split,L3 Lap,L4 Split,L4 Lap\n";
         history.forEach(h => {
             h.athletes.forEach(a => {
@@ -211,11 +225,12 @@
         const blob = new Blob([csv], { type: 'text/csv' });
         const a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
-        a.download = `Meet_Results_Export.csv`;
+        a.download = `Track_Meet_Results.csv`;
         a.click();
     }
 </script>
 </body>
+</html>
 </html>
 </body>
 </html>
