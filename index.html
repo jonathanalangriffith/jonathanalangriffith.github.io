@@ -3,13 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Track Meet Pro - History Edition</title>
+    <title>Track Meet Pro - Comprehensive History</title>
     <style>
         :root { --primary: #1a73e8; --success: #27ae60; --danger: #e74c3c; --warn: #f39c12; --bg: #f0f2f5; }
         body { font-family: -apple-system, sans-serif; background: var(--bg); padding: 10px; color: #333; margin: 0; }
         .container { max-width: 600px; margin: auto; background: white; border-radius: 15px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); overflow: hidden; }
         .tabs { display: flex; background: #eee; border-bottom: 1px solid #ddd; }
-        .tab { flex: 1; padding: 15px; text-align: center; cursor: pointer; font-weight: bold; font-size: 0.9rem; color: #666; border-bottom: 3px solid transparent; }
+        .tab { flex: 1; padding: 15px; text-align: center; cursor: pointer; font-weight: bold; font-size: 0.85rem; color: #666; border-bottom: 3px solid transparent; }
         .tab.active { border-bottom-color: var(--primary); color: var(--primary); background: white; }
         .content { padding: 20px; display: none; }
         .content.active { display: block; }
@@ -23,10 +23,13 @@
         .master-clock { font-size: 3.5rem; font-weight: 800; text-align: center; margin: 15px 0; font-family: monospace; color: var(--danger); background: #fff5f5; border-radius: 10px; padding: 10px; border: 2px solid #ffdada; }
         .athlete-card { border-left: 6px solid var(--primary); padding: 15px; margin-bottom: 10px; background: #f8f9fa; border-radius: 8px; }
         .history-item { background: #fff; border: 1px solid #ddd; border-radius: 10px; padding: 15px; margin-bottom: 15px; }
-        .history-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #eee; padding-bottom: 8px; margin-bottom: 8px; }
-        .history-table { width: 100%; font-size: 0.85rem; border-collapse: collapse; }
-        .history-table td { padding: 4px 0; }
-        .split-tag { background: #fff; border: 1px solid #ddd; padding: 5px; border-radius: 4px; font-size: 0.75rem; margin-top: 5px; }
+        .history-header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 1px solid #eee; padding-bottom: 8px; margin-bottom: 10px; }
+        .history-athlete-row { padding: 8px 0; border-bottom: 1px solid #f0f0f0; }
+        .history-athlete-row:last-child { border-bottom: none; }
+        .history-name-line { display: flex; justify-content: space-between; font-weight: bold; margin-bottom: 4px; }
+        .history-splits-line { display: flex; flex-wrap: wrap; gap: 5px; }
+        .history-split-tag { font-size: 0.7rem; background: #fdfdfd; color: #444; padding: 3px 6px; border-radius: 4px; border: 1px solid #ddd; }
+        .lap-time-sub { color: var(--primary); font-weight: 600; }
     </style>
 </head>
 <body>
@@ -35,7 +38,7 @@
     <div class="tabs">
         <div class="tab active" onclick="switchTab('timer')">Timer</div>
         <div class="tab" onclick="switchTab('roster')">Roster</div>
-        <div class="tab" onclick="switchTab('history-tab'); renderHistory();">Meet History</div>
+        <div class="tab" onclick="switchTab('history-tab'); renderHistory();">History</div>
     </div>
 
     <div id="timer" class="content active">
@@ -70,11 +73,11 @@
 
     <div id="history-tab" class="content">
         <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-            <h3>Stored Results</h3>
-            <button class="btn btn-primary" onclick="exportFullMeet()" style="width:auto; padding: 8px 15px; font-size: 14px;">Export CSV</button>
+            <h3>Meet History</h3>
+            <button class="btn btn-primary" onclick="exportFullMeet()" style="width:auto; padding: 8px 15px; font-size: 14px;">CSV Export</button>
         </div>
         <div id="historyList"></div>
-        <button class="btn btn-danger" onclick="clearAllHistory()" style="margin-top:20px; background: none; border: 1px solid var(--danger); color: var(--danger);">Clear Entire Database</button>
+        <button class="btn btn-danger" onclick="clearAllHistory()" style="margin-top:20px; background: none; border: 1px solid var(--danger); color: var(--danger);">Clear All History</button>
     </div>
 </div>
 
@@ -86,7 +89,7 @@
 
     function switchTab(t) {
         document.querySelectorAll('.tab, .content').forEach(el => el.classList.remove('active'));
-        if (event) event.currentTarget.classList.add('active');
+        if (event && event.currentTarget.classList) event.currentTarget.classList.add('active');
         document.getElementById(t).classList.add('active');
     }
 
@@ -95,7 +98,6 @@
         return `${m}:${s.toString().padStart(2,'0')}.${c.toString().padStart(2,'0')}`;
     }
 
-    // --- Roster Logic ---
     function saveMasterRoster() {
         const boys = document.getElementById('boysInput').value.split(',').map(s => s.trim()).filter(s => s);
         const girls = document.getElementById('girlsInput').value.split(',').map(s => s.trim()).filter(s => s);
@@ -117,7 +119,6 @@
         data[gen].forEach(n => sel.innerHTML += `<option value="${n}">${n}</option>`);
     }
 
-    // --- Timer Logic ---
     function addAthleteFromRoster() {
         const name = document.getElementById('rosterSelect').value;
         if (!name) return;
@@ -134,11 +135,12 @@
             const div = document.createElement('div');
             div.className = `athlete-card ${a.finished ? 'finished' : ''}`;
             div.innerHTML = `
-                <div class="athlete-info">
-                    <strong>${a.name}</strong>
+                <div class="athlete-info"><strong>${a.name}</strong>
                     ${a.finished ? '🏁' : `<button class="btn btn-warn" onclick="recordSplit(${i})" style="width:auto;">${isSprint ? 'FIN' : 'SPLIT'}</button>`}
                 </div>
-                <div class="split-grid">${a.splits.map((s, idx) => `<div class="split-tag"><b>${isSprint ? 'Time' : 'L'+(idx+1)}:</b> ${a.lapTimes[idx]}</div>`).join('')}</div>
+                <div style="display:flex; flex-wrap:wrap; gap:5px; margin-top:5px;">
+                    ${a.splits.map((s, idx) => `<div style="font-size:0.75rem; background:#fff; border:1px solid #ddd; padding:2px 5px; border-radius:4px;">${isSprint ? 'Time' : 'L'+(idx+1)}: ${a.lapTimes[idx]}</div>`).join('')}
+                </div>
             `;
             container.appendChild(div);
         });
@@ -167,7 +169,6 @@
         }
     }
 
-    // --- History Logic ---
     function saveHeatToHistory() {
         const history = JSON.parse(localStorage.getItem('meetHistory') || '[]');
         history.push({
@@ -191,25 +192,32 @@
         const container = document.getElementById('historyList');
         container.innerHTML = history.length ? '' : '<p style="text-align:center; color:#999;">No saved results yet.</p>';
         
-        history.reverse().forEach((heat, index) => {
+        history.reverse().forEach((heat) => {
+            const isSprint = ["100m", "200m", "400m"].includes(heat.distance);
             const div = document.createElement('div');
             div.className = 'history-item';
             div.innerHTML = `
                 <div class="history-header">
-                    <div>
-                        <strong>${heat.meetName}</strong><br>
-                        <small>${heat.date} • ${heat.gender} ${heat.distance}</small>
-                    </div>
-                    <button class="btn btn-danger" onclick="deleteHeat(${heat.id})" style="width:auto; padding:5px 10px; font-size:12px;">Delete</button>
+                    <div><strong>${heat.meetName}</strong><br><small>${heat.date} • ${heat.gender} ${heat.distance}</small></div>
+                    <button class="btn btn-danger" onclick="deleteHeat(${heat.id})" style="width:auto; padding:4px 8px; font-size:11px;">Delete</button>
                 </div>
-                <table class="history-table">
+                <div>
                     ${heat.athletes.map(a => `
-                        <tr>
-                            <td><b>${a.name}</b></td>
-                            <td style="text-align:right;">${a.splits[a.splits.length-1] || 'DNS'}</td>
-                        </tr>
+                        <div class="history-athlete-row">
+                            <div class="history-name-line">
+                                <span>${a.name}</span>
+                                <span>${a.splits[a.splits.length-1] || 'DNS'}</span>
+                            </div>
+                            <div class="history-splits-line">
+                                ${a.splits.map((s, idx) => `
+                                    <span class="history-split-tag">
+                                        ${isSprint ? 'Time' : 'L' + (idx+1)}: ${s} <span class="lap-time-sub">(${a.lapTimes[idx]})</span>
+                                    </span>
+                                `).join('')}
+                            </div>
+                        </div>
                     `).join('')}
-                </table>
+                </div>
             `;
             container.appendChild(div);
         });
@@ -233,17 +241,21 @@
     function exportFullMeet() {
         const history = JSON.parse(localStorage.getItem('meetHistory') || '[]');
         if (!history.length) return alert("No results to export.");
-        let csv = "Meet,Date,Gender,Distance,Athlete,Final,Laps...\n";
+        let csv = "Meet,Date,Gender,Distance,Athlete,Final,L1 Split,L1 Lap,L2 Split,L2 Lap,L3 Split,L3 Lap,L4 Split,L4 Lap...\n";
         history.forEach(h => {
             h.athletes.forEach(a => {
-                let row = [h.meetName, h.date, h.gender, h.distance, a.name, a.splits[a.splits.length-1], ...a.splits];
+                let row = [h.meetName, h.date, h.gender, h.distance, a.name, a.splits[a.splits.length-1]];
+                a.splits.forEach((s, idx) => {
+                    row.push(s); 
+                    row.push(a.lapTimes[idx]);
+                });
                 csv += row.join(',') + "\n";
             });
         });
         const blob = new Blob([csv], { type: 'text/csv' });
         const a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
-        a.download = `Meet_History_Export.csv`;
+        a.download = `Meet_History_Full.csv`;
         a.click();
     }
 </script>
