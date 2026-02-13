@@ -3,39 +3,39 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BHS Timer</title>
+    <title>Track Meet Pro - History Edition</title>
     <style>
         :root { --primary: #1a73e8; --success: #27ae60; --danger: #e74c3c; --warn: #f39c12; --bg: #f0f2f5; }
         body { font-family: -apple-system, sans-serif; background: var(--bg); padding: 10px; color: #333; margin: 0; }
         .container { max-width: 600px; margin: auto; background: white; border-radius: 15px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); overflow: hidden; }
-        .tabs { display: flex; background: #eee; }
-        .tab { flex: 1; padding: 15px; text-align: center; cursor: pointer; font-weight: bold; border-bottom: 3px solid transparent; }
+        .tabs { display: flex; background: #eee; border-bottom: 1px solid #ddd; }
+        .tab { flex: 1; padding: 15px; text-align: center; cursor: pointer; font-weight: bold; font-size: 0.9rem; color: #666; border-bottom: 3px solid transparent; }
         .tab.active { border-bottom-color: var(--primary); color: var(--primary); background: white; }
         .content { padding: 20px; display: none; }
         .content.active { display: block; }
         .section { margin-bottom: 20px; padding-bottom: 15px; border-bottom: 1px solid #eee; }
         input, select, button, textarea { padding: 12px; border-radius: 8px; border: 1px solid #ddd; font-size: 16px; width: 100%; box-sizing: border-box; }
-        .btn { font-weight: bold; border: none; cursor: pointer; color: white; transition: 0.1s; active { transform: scale(0.98); } }
+        .btn { font-weight: bold; border: none; cursor: pointer; color: white; }
         .btn-primary { background: var(--primary); }
         .btn-success { background: var(--success); }
         .btn-warn { background: var(--warn); }
-        .btn-danger-outline { background: transparent; color: var(--danger); border: 2px solid var(--danger); margin-top: 15px; }
+        .btn-danger { background: var(--danger); }
         .master-clock { font-size: 3.5rem; font-weight: 800; text-align: center; margin: 15px 0; font-family: monospace; color: var(--danger); background: #fff5f5; border-radius: 10px; padding: 10px; border: 2px solid #ffdada; }
         .athlete-card { border-left: 6px solid var(--primary); padding: 15px; margin-bottom: 10px; background: #f8f9fa; border-radius: 8px; }
-        .athlete-card.finished { border-left-color: #333; background-color: #eee; }
-        .athlete-info { display: flex; justify-content: space-between; align-items: center; }
-        .split-grid { margin-top: 10px; display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 8px; }
-        .split-tag { background: #fff; border: 1px solid #ddd; padding: 8px; border-radius: 4px; font-size: 0.85rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
-        .lap-val { color: var(--primary); font-weight: bold; display: block; }
-        .total-val { color: #666; font-size: 0.75rem; display: block; }
+        .history-item { background: #fff; border: 1px solid #ddd; border-radius: 10px; padding: 15px; margin-bottom: 15px; }
+        .history-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #eee; padding-bottom: 8px; margin-bottom: 8px; }
+        .history-table { width: 100%; font-size: 0.85rem; border-collapse: collapse; }
+        .history-table td { padding: 4px 0; }
+        .split-tag { background: #fff; border: 1px solid #ddd; padding: 5px; border-radius: 4px; font-size: 0.75rem; margin-top: 5px; }
     </style>
 </head>
 <body>
 
 <div class="container">
     <div class="tabs">
-        <div class="tab active" onclick="switchTab('timer')">Race Timer</div>
-        <div class="tab" onclick="switchTab('roster')">Team Roster</div>
+        <div class="tab active" onclick="switchTab('timer')">Timer</div>
+        <div class="tab" onclick="switchTab('roster')">Roster</div>
+        <div class="tab" onclick="switchTab('history-tab'); renderHistory();">Meet History</div>
     </div>
 
     <div id="timer" class="content active">
@@ -56,20 +56,25 @@
             </div>
             <button class="btn btn-success" id="startBtn" onclick="startRace()" style="margin-top:10px;">START HEAT</button>
         </div>
-
         <div class="master-clock" id="display">00:00.00</div>
         <div id="activeRoster"></div>
-        
-        <button class="btn btn-warn" id="saveHeatBtn" onclick="saveHeatToHistory()" style="display:none; margin-top:10px;">FINISH & SAVE HEAT</button>
-        <button class="btn btn-primary" onclick="exportFullMeet()" style="margin-top:20px;">EXPORT FULL MEET TO EXCEL</button>
-        <button class="btn btn-danger-outline" onclick="clearAllHistory()">CLEAR ALL SAVED HISTORY</button>
+        <button class="btn btn-warn" id="saveHeatBtn" onclick="saveHeatToHistory()" style="display:none; margin-top:10px;">SAVE HEAT RESULTS</button>
     </div>
 
     <div id="roster" class="content">
-        <h3>Roster Management</h3>
-        <textarea id="boysInput" rows="4" placeholder="Boys names (comma separated)"></textarea>
-        <textarea id="girlsInput" rows="4" placeholder="Girls names (comma separated)" style="margin-top:10px;"></textarea>
+        <h3>Team Roster</h3>
+        <textarea id="boysInput" rows="4" placeholder="Boys (comma separated)"></textarea>
+        <textarea id="girlsInput" rows="4" placeholder="Girls (comma separated)" style="margin-top:10px;"></textarea>
         <button class="btn btn-primary" onclick="saveMasterRoster()" style="margin-top:10px;">Save Roster</button>
+    </div>
+
+    <div id="history-tab" class="content">
+        <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+            <h3>Stored Results</h3>
+            <button class="btn btn-primary" onclick="exportFullMeet()" style="width:auto; padding: 8px 15px; font-size: 14px;">Export CSV</button>
+        </div>
+        <div id="historyList"></div>
+        <button class="btn btn-danger" onclick="clearAllHistory()" style="margin-top:20px; background: none; border: 1px solid var(--danger); color: var(--danger);">Clear Entire Database</button>
     </div>
 </div>
 
@@ -81,22 +86,21 @@
 
     function switchTab(t) {
         document.querySelectorAll('.tab, .content').forEach(el => el.classList.remove('active'));
-        event.currentTarget.classList.add('active');
+        if (event) event.currentTarget.classList.add('active');
         document.getElementById(t).classList.add('active');
     }
 
     function formatTime(ms) {
-        if (isNaN(ms) || ms < 0) return "0:00.00";
         let m = Math.floor(ms/60000), s = Math.floor((ms%60000)/1000), c = Math.floor((ms%1000)/10);
         return `${m}:${s.toString().padStart(2,'0')}.${c.toString().padStart(2,'0')}`;
     }
 
+    // --- Roster Logic ---
     function saveMasterRoster() {
         const boys = document.getElementById('boysInput').value.split(',').map(s => s.trim()).filter(s => s);
         const girls = document.getElementById('girlsInput').value.split(',').map(s => s.trim()).filter(s => s);
         localStorage.setItem('masterRoster', JSON.stringify({ boys, girls }));
-        updateRosterSelect();
-        alert("Roster Saved!");
+        updateRosterSelect(); alert("Roster Saved!");
     }
 
     function loadMasterRoster() {
@@ -113,6 +117,7 @@
         data[gen].forEach(n => sel.innerHTML += `<option value="${n}">${n}</option>`);
     }
 
+    // --- Timer Logic ---
     function addAthleteFromRoster() {
         const name = document.getElementById('rosterSelect').value;
         if (!name) return;
@@ -125,107 +130,120 @@
         const dist = document.getElementById('raceDistance').value;
         const isSprint = ["100", "200", "400"].includes(dist);
         container.innerHTML = '';
-
         athletes.forEach((a, i) => {
             const div = document.createElement('div');
             div.className = `athlete-card ${a.finished ? 'finished' : ''}`;
             div.innerHTML = `
                 <div class="athlete-info">
                     <strong>${a.name}</strong>
-                    ${a.finished ? '🏁' : `<button class="btn btn-warn" onclick="recordSplit(${i})" style="width:auto;">${isSprint ? 'FINISH' : 'SPLIT'}</button>`}
+                    ${a.finished ? '🏁' : `<button class="btn btn-warn" onclick="recordSplit(${i})" style="width:auto;">${isSprint ? 'FIN' : 'SPLIT'}</button>`}
                 </div>
-                <div class="split-grid">
-                    ${a.splits.map((s, idx) => `
-                        <div class="split-tag">
-                            <span class="lap-val">${isSprint ? 'Time' : 'Lap '+(idx+1)}: ${a.lapTimes[idx]}</span>
-                            ${!isSprint ? `<span class="total-val">Total: ${s}</span>` : ''}
-                        </div>
-                    `).join('')}
-                </div>
+                <div class="split-grid">${a.splits.map((s, idx) => `<div class="split-tag"><b>${isSprint ? 'Time' : 'L'+(idx+1)}:</b> ${a.lapTimes[idx]}</div>`).join('')}</div>
             `;
             container.appendChild(div);
         });
     }
 
     function startRace() {
-        if (!athletes.length) return alert("Add athletes first!");
-        running = true;
-        startTime = Date.now();
-        interval = setInterval(() => {
-            document.getElementById('display').innerText = formatTime(Date.now() - startTime);
-        }, 10);
+        if (!athletes.length) return;
+        running = true; startTime = Date.now();
+        interval = setInterval(() => document.getElementById('display').innerText = formatTime(Date.now()-startTime), 10);
         document.getElementById('startBtn').disabled = true;
         document.getElementById('saveHeatBtn').style.display = 'block';
     }
 
     function recordSplit(i) {
         if (!running) return;
-        
-        const distKey = document.getElementById('raceDistance').value;
-        const totalLaps = parseInt(lapMap[distKey]);
-        const nowMs = Date.now();
-        const elapsed = nowMs - startTime;
+        const totalLaps = lapMap[document.getElementById('raceDistance').value];
+        const elapsed = Date.now() - startTime;
         const a = athletes[i];
-
         if (a.splits.length < totalLaps) {
-            const lastMs = a.splitsMs.length > 0 ? a.splitsMs[a.splitsMs.length - 1] : 0;
-            const lapDuration = elapsed - lastMs;
-            
-            // Push formatted strings and raw numbers
+            const lastMs = a.splitsMs.length > 0 ? a.splitsMs[a.splitsMs.length-1] : 0;
             a.splits.push(formatTime(elapsed));
             a.splitsMs.push(elapsed);
-            a.lapTimes.push(formatTime(lapDuration));
-            
-            if (a.splits.length >= totalLaps) {
-                a.finished = true;
-            }
+            a.lapTimes.push(formatTime(elapsed - lastMs));
+            if (a.splits.length == totalLaps) a.finished = true;
             renderActiveRoster();
         }
     }
 
+    // --- History Logic ---
     function saveHeatToHistory() {
         const history = JSON.parse(localStorage.getItem('meetHistory') || '[]');
         history.push({
-            meetName: document.getElementById('meetName').value || "Meet",
+            id: Date.now(),
+            meetName: document.getElementById('meetName').value || "Unnamed Meet",
             gender: document.getElementById('gender').value,
             distance: document.getElementById('raceDistance').value + 'm',
             athletes: JSON.parse(JSON.stringify(athletes)),
             date: new Date().toLocaleDateString()
         });
         localStorage.setItem('meetHistory', JSON.stringify(history));
-        
-        athletes = []; 
-        running = false; 
-        clearInterval(interval);
+        athletes = []; running = false; clearInterval(interval);
         document.getElementById('display').innerText = "00:00.00";
         document.getElementById('startBtn').disabled = false;
         document.getElementById('saveHeatBtn').style.display = 'none';
         renderActiveRoster();
     }
 
+    function renderHistory() {
+        const history = JSON.parse(localStorage.getItem('meetHistory') || '[]');
+        const container = document.getElementById('historyList');
+        container.innerHTML = history.length ? '' : '<p style="text-align:center; color:#999;">No saved results yet.</p>';
+        
+        history.reverse().forEach((heat, index) => {
+            const div = document.createElement('div');
+            div.className = 'history-item';
+            div.innerHTML = `
+                <div class="history-header">
+                    <div>
+                        <strong>${heat.meetName}</strong><br>
+                        <small>${heat.date} • ${heat.gender} ${heat.distance}</small>
+                    </div>
+                    <button class="btn btn-danger" onclick="deleteHeat(${heat.id})" style="width:auto; padding:5px 10px; font-size:12px;">Delete</button>
+                </div>
+                <table class="history-table">
+                    ${heat.athletes.map(a => `
+                        <tr>
+                            <td><b>${a.name}</b></td>
+                            <td style="text-align:right;">${a.splits[a.splits.length-1] || 'DNS'}</td>
+                        </tr>
+                    `).join('')}
+                </table>
+            `;
+            container.appendChild(div);
+        });
+    }
+
+    function deleteHeat(id) {
+        if (!confirm("Delete this heat result?")) return;
+        let history = JSON.parse(localStorage.getItem('meetHistory') || '[]');
+        history = history.filter(h => h.id !== id);
+        localStorage.setItem('meetHistory', JSON.stringify(history));
+        renderHistory();
+    }
+
     function clearAllHistory() {
-        if(confirm("Permanently delete ALL saved results?")) {
+        if (confirm("Delete EVERYTHING? This cannot be undone.")) {
             localStorage.removeItem('meetHistory');
-            alert("History cleared.");
+            renderHistory();
         }
     }
 
     function exportFullMeet() {
         const history = JSON.parse(localStorage.getItem('meetHistory') || '[]');
-        if (!history.length) return alert("No results saved.");
-        
-        let csv = "Meet Name,Date,Gender,Distance,Athlete,Final Time,L1 Split,L1 Lap,L2 Split,L2 Lap,L3 Split,L3 Lap,L4 Split,L4 Lap\n";
+        if (!history.length) return alert("No results to export.");
+        let csv = "Meet,Date,Gender,Distance,Athlete,Final,Laps...\n";
         history.forEach(h => {
             h.athletes.forEach(a => {
-                let row = [h.meetName, h.date, h.gender, h.distance, a.name, a.splits[a.splits.length-1]];
-                a.splits.forEach((s, idx) => { row.push(s); row.push(a.lapTimes[idx]); });
+                let row = [h.meetName, h.date, h.gender, h.distance, a.name, a.splits[a.splits.length-1], ...a.splits];
                 csv += row.join(',') + "\n";
             });
         });
         const blob = new Blob([csv], { type: 'text/csv' });
         const a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
-        a.download = `Track_Meet_Results.csv`;
+        a.download = `Meet_History_Export.csv`;
         a.click();
     }
 </script>
