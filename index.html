@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BHS RACE TIMER</title>
+    <title>BHS Timer</title>
     <style>
         :root { --primary: #1a73e8; --success: #27ae60; --danger: #e74c3c; --warn: #f39c12; --bg: #f0f2f5; }
         body { font-family: -apple-system, sans-serif; background: var(--bg); padding: 10px; color: #333; margin: 0; }
@@ -43,11 +43,16 @@
             <input type="text" id="meetName" placeholder="Meet Name" style="margin-bottom: 10px;">
             <div style="display: flex; gap: 5px; margin-bottom: 10px;">
                 <select id="raceDistance" onchange="renderActiveRoster()">
-                    <option value="100">100m</option><option value="200">200m</option><option value="400">400m</option>
-                    <option value="800">800m</option><option value="1600" selected>1600m</option><option value="3200">3200m</option>
+                    <option value="100">100m</option>
+                    <option value="200">200m</option>
+                    <option value="400">400m</option>
+                    <option value="800">800m</option>
+                    <option value="1600" selected>1600m</option>
+                    <option value="3200">3200m</option>
                 </select>
                 <select id="gender" onchange="updateRosterSelect()">
-                    <option value="Boys">Boys</option><option value="Girls">Girls</option>
+                    <option value="Boys">Boys</option>
+                    <option value="Girls">Girls</option>
                 </select>
             </div>
             <div style="display: grid; grid-template-columns: 2fr 1fr auto; gap: 5px;">
@@ -122,6 +127,8 @@
         const container = document.getElementById('activeRoster');
         const dist = document.getElementById('raceDistance').value;
         const totalLaps = lapMap[dist];
+        const isSprint = ["100", "200", "400"].includes(dist);
+        
         container.innerHTML = '';
         athletes.forEach((a, i) => {
             const div = document.createElement('div');
@@ -129,13 +136,13 @@
             div.innerHTML = `
                 <div class="athlete-info">
                     <strong>${a.name}</strong>
-                    ${a.finished ? '🏁' : `<button class="btn btn-warn" onclick="recordSplit(${i})" ${!running ? 'disabled' : ''} style="width:auto;">SPLIT</button>`}
+                    ${a.finished ? '🏁' : `<button class="btn btn-warn" onclick="recordSplit(${i})" ${!running ? 'disabled' : ''} style="width:auto;">${isSprint ? 'FINISH' : 'SPLIT'}</button>`}
                 </div>
                 <div class="split-grid">
                     ${a.splits.map((s, idx) => `
                         <div class="split-tag">
-                            <span class="lap-time">Lap ${idx+1}: ${a.lapTimes[idx]}</span>
-                            <span class="total-time">Total: ${s}</span>
+                            <span class="lap-time">${isSprint ? 'Time' : 'Lap ' + (idx+1)}: ${a.lapTimes[idx]}</span>
+                            ${!isSprint ? `<span class="total-time">Total: ${s}</span>` : ''}
                         </div>
                     `).join('')}
                 </div>
@@ -154,10 +161,13 @@
     }
 
     function recordSplit(i) {
-        const totalLaps = lapMap[document.getElementById('raceDistance').value];
+        const dist = document.getElementById('raceDistance').value;
+        const totalLaps = lapMap[dist];
         const elapsed = Date.now() - startTime;
         const a = athletes[i];
+
         if (a.splits.length < totalLaps) {
+            // Fix: If it's the first split, the lap time is just the elapsed time.
             const lastSplitMs = a.splitsMs.length > 0 ? a.splitsMs[a.splitsMs.length-1] : 0;
             const currentLapMs = elapsed - lastSplitMs;
             
@@ -165,7 +175,9 @@
             a.splitsMs.push(elapsed);
             a.lapTimes.push(formatTime(currentLapMs));
             
-            if (a.splits.length == totalLaps) a.finished = true;
+            if (a.splits.length == totalLaps) {
+                a.finished = true;
+            }
             renderActiveRoster();
         }
     }
@@ -180,7 +192,11 @@
             date: new Date().toLocaleDateString()
         });
         localStorage.setItem('meetHistory', JSON.stringify(history));
-        athletes = []; running = false; clearInterval(interval);
+        
+        // Reset for next heat
+        athletes = []; 
+        running = false; 
+        clearInterval(interval);
         document.getElementById('display').innerText = "00:00.00";
         document.getElementById('startBtn').disabled = false;
         document.getElementById('saveHeatBtn').style.display = 'none';
@@ -189,13 +205,15 @@
 
     function exportFullMeet() {
         const history = JSON.parse(localStorage.getItem('meetHistory') || '[]');
+        if (!history.length) return alert("No results saved yet.");
+        
         let csv = "Meet,Date,Gender,Dist,Athlete,Final,L1_Split,L1_Lap,L2_Split,L2_Lap,L3_Split,L3_Lap,L4_Split,L4_Lap\n";
         history.forEach(h => {
             h.athletes.forEach(a => {
                 let row = [h.meetName, h.date, h.gender, h.distance, a.name, a.splits[a.splits.length-1]];
                 a.splits.forEach((s, idx) => {
-                    row.push(s); // Cumulative
-                    row.push(a.lapTimes[idx]); // Individual Lap
+                    row.push(s); 
+                    row.push(a.lapTimes[idx]);
                 });
                 csv += row.join(',') + "\n";
             });
